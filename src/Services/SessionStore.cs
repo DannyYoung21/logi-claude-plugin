@@ -272,16 +272,16 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     break;
                 case "Stop":
                     session.MainTurnRunning = false;
-                    session.BackgroundTasksRunning = HasBackgroundWork(payload);
-                    state = session.BackgroundTasksRunning || agentsPaused ? AgentSessionState.Background : AgentSessionState.Complete;
+                    ReadBackgroundWork(session, payload);
+                    state = session.HasBackgroundWork || agentsPaused ? AgentSessionState.Background : AgentSessionState.Complete;
                     session.PendingTool = String.Empty;
                     break;
                 case "SubagentStop":
                     // A background subagent finished (or paused): what else still runs decides
                     if (!session.MainTurnRunning && state is AgentSessionState.Background or AgentSessionState.Complete)
                     {
-                        session.BackgroundTasksRunning = HasBackgroundWork(payload);
-                        state = session.BackgroundTasksRunning ? AgentSessionState.Background : AgentSessionState.Complete;
+                        ReadBackgroundWork(session, payload);
+                        state = session.HasBackgroundWork ? AgentSessionState.Background : AgentSessionState.Complete;
                     }
                     break;
                 case "StopFailure":
@@ -308,9 +308,19 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
         // Stop and SubagentStop list the work still in flight (subagents, background shell commands, monitors, workflows)
         // that will wake the session again. Scheduled wakeups (session_crons) do not count: nothing runs until they fire.
-        private static Boolean HasBackgroundWork(JsonElement payload) =>
-            payload.TryGetProperty("background_tasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array &&
-            tasks.EnumerateArray().Any(t => GetString(t, "status") is not ("completed" or "failed" or "killed" or "stopped"));
+        private static void ReadBackgroundWork(ClaudeSession session, JsonElement payload)
+        {
+            var running = payload.TryGetProperty("background_tasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array
+                ? tasks.EnumerateArray()
+                    .Where(t => GetString(t, "status") is not ("completed" or "failed" or "killed" or "stopped"))
+                    .Select(t => GetString(t, "type"))
+                    .ToList()
+                : new List<String>();
+            session.BackgroundShellsRunning = running.Any(IsShellTask);
+            session.BackgroundTasksRunning = running.Any(t => !IsShellTask(t));
+        }
+
+        private static Boolean IsShellTask(String type) => type is "shell" or "monitor";
 
         // rate_limits go to UsageLimitService; here the exact context window of terminal sessions
         public void ApplyStatusline(JsonElement payload)
@@ -479,6 +489,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             }
 
             var now = DateTime.UtcNow;
+            var shellParents = this.ReadShellParentsIfNeeded(work.Select(w => w.Session), now);
             foreach (var (session, reader) in work)
             {
                 reader.Update();
@@ -503,31 +514,8 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                         this.ReleasePending(session.Id, _ => true);
                         this._stopRequested.Remove(session.Id);
                     }
-                    UpdateBackgroundState(session, reader, now);
+                    UpdateBackgroundState(session, reader, shellParents, now);
                 }
-            }
-        }
-
-        // Between hooks: a subagent that paused on its own background work keeps the session in Background, and once
-        // no subagent counts as paused anymore (it never reported back within the hour) the session is done
-        private static void UpdateBackgroundState(ClaudeSession session, TranscriptReader reader, DateTime now)
-        {
-            if (session.MainTurnRunning)
-            {
-                return;
-            }
-            var paused = reader.HasPausedAgents(now);
-            var next = session.State switch
-            {
-                AgentSessionState.Complete when paused => AgentSessionState.Background,
-                AgentSessionState.Background when !paused && !session.BackgroundTasksRunning => AgentSessionState.Complete,
-                _ => session.State
-            };
-            if (next != session.State)
-            {
-                Log($"[STATE] {session.DisplayName}: {session.State} -> {next} (background subagents)");
-                session.State = next;
-                session.StatusSince = now;
             }
         }
 

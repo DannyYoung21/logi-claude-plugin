@@ -15,8 +15,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         private const String SessionIdField = "\"sessionId\":\"";
 
         // A background subagent that pauses while its own background work (a monitor, a test run) goes on reports back
-        // with this note; the turn of the main agent then ends with nothing "in flight", although the subagent resumes later
-        private const String TaskNotification = "<task-notification>";
+        // with this note; the turn of the main agent then ends with nothing "in flight", although the subagent resumes later.
+        // Only lines Claude Code itself marks as a task-notification count: a summary, a prompt or tool output that merely
+        // quotes one has the marker inside an escaped string. A notification that arrives mid-turn is an attachment line.
+        private const String TaskNotificationOrigin = "\"kind\":\"task-notification\"";
         private const String PausedNote = "background work of its own still running";
 
         // A paused subagent that never reports again (killed, app closed) stops counting after this long
@@ -146,7 +148,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             var isUser = !isAssistant && line.Contains("\"type\":\"user\"", StringComparison.Ordinal);
             var isTitle = !isAssistant && !isUser && line.Contains("\"type\":\"custom-title\"", StringComparison.Ordinal);
 
-            if (isUser && line.Contains(TaskNotification, StringComparison.Ordinal))
+            if (line.Contains(TaskNotificationOrigin, StringComparison.Ordinal))
             {
                 this.ReadTaskNotification(line);
             }
@@ -222,17 +224,20 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             {
                 return;
             }
+            var taskId = id.Groups[1].Value;
+            var ts = TimestampPattern.Match(line);
+            var at = ts.Success &&
+                DateTimeOffset.TryParse(ts.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+                ? parsed.UtcDateTime
+                : DateTime.UtcNow;
             if (line.Contains(PausedNote, StringComparison.Ordinal))
             {
-                var ts = TimestampPattern.Match(line);
-                this._pausedAgents[id.Groups[1].Value] = ts.Success &&
-                    DateTimeOffset.TryParse(ts.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
-                    ? at.UtcDateTime
-                    : DateTime.UtcNow;
+                this._pausedAgents[taskId] = at;
             }
-            else
+            else if (this._pausedAgents.TryGetValue(taskId, out var pausedAt) && at >= pausedAt)
             {
-                this._pausedAgents.Remove(id.Groups[1].Value);
+                // Lines are not strictly in time order: an older report must not clear a newer pause
+                this._pausedAgents.Remove(taskId);
             }
         }
 

@@ -90,8 +90,14 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
         // outside such a turn and must not make the session look busy in the foreground.
         public Boolean MainTurnRunning { get; set; }
 
-        // The last Stop / SubagentStop listed work still in flight (subagents, background commands, monitors)
+        // The last Stop / SubagentStop listed work still in flight: subagents and workflows ...
         public Boolean BackgroundTasksRunning { get; set; }
+
+        // ... and background commands or monitors. Claude Code keeps listing some of these as running after they are
+        // gone, so they only count while the session's process still has a shell running.
+        public Boolean BackgroundShellsRunning { get; set; }
+
+        public Boolean HasBackgroundWork => this.BackgroundTasksRunning || this.BackgroundShellsRunning;
 
         // Session id the desktop app used before it restarted Claude Code under this one (its file may still name it)
         public String PredecessorId { get; set; }
