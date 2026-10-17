@@ -219,13 +219,22 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
             // Tool hooks of a subagent carry its agent_id. Outside a turn of the main agent they come from background
             // subagents: the session keeps working in the background, not in the foreground.
-            var fromSubagent = !String.IsNullOrEmpty(GetString(payload, "agent_id"));
+            var agentId = GetString(payload, "agent_id") ?? String.Empty;
+            var fromSubagent = agentId.Length > 0;
+            var isToolHook = evt is "PreToolUse" or "PostToolUse" or "PostToolUseFailure";
+
+            // While one agent waits for the user, the others keep working: their tool hooks leave the wait as it is
+            if (isToolHook && session.IsWaitingForUser && session.WaitingAgentId != null && session.WaitingAgentId != agentId)
+            {
+                return;
+            }
+
             var working = fromSubagent && !session.MainTurnRunning ? AgentSessionState.Background : AgentSessionState.Thinking;
-            if (evt == "UserPromptSubmit" || (!fromSubagent && evt is "PreToolUse" or "PostToolUse" or "PostToolUseFailure"))
+            if (evt == "UserPromptSubmit" || (!fromSubagent && isToolHook))
             {
                 session.MainTurnRunning = true;
             }
-            else if (working == AgentSessionState.Background && evt is "PreToolUse" or "PostToolUse" or "PostToolUseFailure")
+            else if (working == AgentSessionState.Background && isToolHook)
             {
                 session.BackgroundTasksRunning = true;  // a background subagent is clearly at work
             }
@@ -249,11 +258,13 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     var question = IsQuestion(payload);
                     state = question ? AgentSessionState.Choose : working;
                     session.PendingTool = question ? GetString(payload, "tool_name") : String.Empty;
+                    session.WaitingAgentId = question ? agentId : null;
                     break;
                 case "PermissionRequest":
                     // Claude also asks permission to show the question: it is still a choice, not a permission
                     state = IsQuestion(payload) ? AgentSessionState.Choose : AgentSessionState.Permission;
                     session.PendingTool = GetString(payload, "tool_name") ?? String.Empty;
+                    session.WaitingAgentId = agentId;
                     break;
                 case "PostToolUse":
                 case "PostToolUseFailure":
@@ -265,6 +276,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     if (type == "permission_prompt" && state is AgentSessionState.Thinking or AgentSessionState.Background)
                     {
                         state = AgentSessionState.Permission;
+                        session.WaitingAgentId = null;  // the notification does not say whose dialog it is
                     }
                     else if (type == "elicitation_dialog" && state == AgentSessionState.Thinking)
                     {
@@ -294,6 +306,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
             // StatusSince is set by the caller once the final state is known (a held request keeps "Permission")
             session.State = state;
+            if (!session.IsWaitingForUser)
+            {
+                session.WaitingAgentId = null;
+            }
         }
 
         // The transcript is read up to now first: the report of a paused subagent comes in right before the Stop hook

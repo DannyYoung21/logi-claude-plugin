@@ -60,6 +60,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
         // Tool waiting for permission (PermissionRequest) or the question being asked
         public String PendingTool { get; set; } = String.Empty;
 
+        // Who waits for the user in Permission / Choose: "" = the main agent, else a subagent's agent_id, null = not known.
+        // Tool hooks of the other agents (background subagents keep working) must not end the wait.
+        public String WaitingAgentId { get; set; }
+
         public Int64 InputTokens { get; set; }
         public Int64 OutputTokens { get; set; }
         public Int64 CacheReadTokens { get; set; }
