@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34408.163
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClaudeControllerPlugin", "src\ClaudeControllerPlugin.csproj", "{9700F824-30CC-430F-B09A-02EDF6586EBA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1060397B-A24F-438F-8213-A82E1613AB83}"
+	ProjectSection(SolutionItems) = preProject
+		.vscode\launch.json = .vscode\launch.json
+		.vscode\tasks.json = .vscode\tasks.json
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9700F824-30CC-430F-B09A-02EDF6586EBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9700F824-30CC-430F-B09A-02EDF6586EBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9700F824-30CC-430F-B09A-02EDF6586EBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9700F824-30CC-430F-B09A-02EDF6586EBA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DC152B85-6576-4ABF-BF5F-7490C9709F66}
+	EndGlobalSection
+EndGlobal

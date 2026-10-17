@@ -1,0 +1,28 @@
+type: plugin4
+name: ClaudeController
+displayName: Claude Controller
+version: 1.0.0
+author: Daniele Mazzotta
+homePageUrl: https://github.com/DannyYoung21/logi-claude-plugin
+supportPageUrl: https://github.com/DannyYoung21/logi-claude-plugin/issues
+copyright: Copyright © 2026 Daniele Mazzotta
+description: |
+  Unofficial plugin that controls Claude Code sessions (Claude desktop app and terminal) from the Logitech MX Creative Keypad (macOS only):
+  up to 16 live session slots, Allow Once / Allow in Session / Always Allow / Deny, Stop, next waiting session,
+  new code session and new chat / Cowork task, token and context usage, and 5h / weekly usage limits with reset times.
+  This is an unofficial community plugin, not affiliated with or endorsed by Anthropic.
+  The only network request asks api.anthropic.com for your own usage limits; everything else stays on your Mac.
+  Support: dannylabs.studio@gmail.com
+icon256x256: Icon256x256.png
+backgroundColor: 4281017376
+foregroundColor: 4294967295
+textColor: 4294967295
+supportedDevices:
+    - MxCreativeKeypad
+pluginFileName: ClaudeControllerPlugin.dll
+pluginFolderMac: bin
+pluginCapabilities:
+    - HasNoApplication
+minimumLoupedeckVersion: 6.0
+license: MIT
+licenseUrl: https://opensource.org/licenses/MIT
