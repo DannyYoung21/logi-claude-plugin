@@ -246,12 +246,13 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     break;
                 case "PreToolUse":
                     // AskUserQuestion shows options in the app: the session waits for a choice
-                    var tool = GetString(payload, "tool_name");
-                    state = tool == "AskUserQuestion" ? AgentSessionState.Choose : working;
-                    session.PendingTool = tool == "AskUserQuestion" ? tool : String.Empty;
+                    var question = IsQuestion(payload);
+                    state = question ? AgentSessionState.Choose : working;
+                    session.PendingTool = question ? GetString(payload, "tool_name") : String.Empty;
                     break;
                 case "PermissionRequest":
-                    state = AgentSessionState.Permission;
+                    // Claude also asks permission to show the question: it is still a choice, not a permission
+                    state = IsQuestion(payload) ? AgentSessionState.Choose : AgentSessionState.Permission;
                     session.PendingTool = GetString(payload, "tool_name") ?? String.Empty;
                     break;
                 case "PostToolUse":
@@ -308,6 +309,8 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
         // Stop and SubagentStop list the work still in flight (subagents, background shell commands, monitors, workflows)
         // that will wake the session again. Scheduled wakeups (session_crons) do not count: nothing runs until they fire.
+        private static Boolean IsQuestion(JsonElement payload) => GetString(payload, "tool_name") == "AskUserQuestion";
+
         private static void ReadBackgroundWork(ClaudeSession session, JsonElement payload)
         {
             var running = payload.TryGetProperty("background_tasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array

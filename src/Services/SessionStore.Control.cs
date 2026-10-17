@@ -79,7 +79,9 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             }
             halted = this._haltedByKeypad.Contains(session.Id);
 
-            if (evt != "PermissionRequest")
+            // A question with options also asks for permission to show it. "Allow" would skip the question, so the plugin
+            // leaves it to Claude: the session shows "Choose" and is answered in the app.
+            if (evt != "PermissionRequest" || IsQuestion(payload))
             {
                 return null;
             }
