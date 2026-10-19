@@ -233,6 +233,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             if (evt == "UserPromptSubmit" || (!fromSubagent && isToolHook))
             {
                 session.MainTurnRunning = true;
+                session.AwaitsReply = evt == "PostToolUse" && IsNextStepQuestion(payload);
             }
             else if (working == AgentSessionState.Background && isToolHook)
             {
@@ -245,7 +246,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     // The desktop app restarts Claude Code on its own (source "resume"): a finished session keeps showing
                     // how it ended. A turn that was running is gone with the old process.
                     var source = GetString(payload, "source");
-                    if (source != "compact" && !(source == "resume" && session.IsFinished))
+                    if (source != "compact" && !(source == "resume" && (session.IsFinished || session.AwaitsReply)))
                     {
                         state = AgentSessionState.Idle;
                     }
@@ -286,8 +287,11 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 case "Stop":
                     session.MainTurnRunning = false;
                     ReadBackgroundWork(session, payload);
-                    state = session.HasBackgroundWork || agentsPaused ? AgentSessionState.Background : AgentSessionState.Complete;
+                    state = session.AwaitsReply ? AgentSessionState.Choose
+                        : session.HasBackgroundWork || agentsPaused ? AgentSessionState.Background
+                        : AgentSessionState.Complete;
                     session.PendingTool = String.Empty;
+                    session.WaitingAgentId = session.AwaitsReply ? String.Empty : null;
                     break;
                 case "SubagentStop":
                     // A background subagent finished (or paused): what else still runs decides
@@ -326,6 +330,14 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         // Stop and SubagentStop list the work still in flight (subagents, background shell commands, monitors, workflows)
         // that will wake the session again. Scheduled wakeups (session_crons) do not count: nothing runs until they fire.
         private static Boolean IsQuestion(JsonElement payload) => GetString(payload, "tool_name") == "AskUserQuestion";
+
+        // The desktop app's wrap-up tool with a question shows it with answer buttons and ends the turn. Its result says
+        // whether the box really shows the question ("Nothing is pending, so the app draws no box" otherwise).
+        private static Boolean IsNextStepQuestion(JsonElement payload) =>
+            GetString(payload, "tool_name") == "mcp__ccd_turn__wrap_up" &&
+            payload.TryGetProperty("tool_input", out var input) && !String.IsNullOrWhiteSpace(GetString(input, "ask")) &&
+            !(payload.TryGetProperty("tool_response", out var response) &&
+              response.GetRawText().Contains("draws no box", StringComparison.Ordinal));
 
         private static void ReadBackgroundWork(ClaudeSession session, JsonElement payload)
         {
@@ -660,6 +672,8 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 // Started but no prompt yet: keep showing how the session ended (e.g. Stopped)
                 session.State = old.State;
                 session.StatusSince = old.StatusSince;
+                session.AwaitsReply = old.AwaitsReply;
+                session.WaitingAgentId = old.WaitingAgentId;
             }
             this.Forget(old);
             Log($"[SESSION] {session.DisplayName} continues as {session.Id} (from transcript)");

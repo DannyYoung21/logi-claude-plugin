@@ -64,6 +64,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
         // Tool hooks of the other agents (background subagents keep working) must not end the wait.
         public String WaitingAgentId { get; set; }
 
+        // The turn ended with a question and answer buttons (the desktop app's next-step box): the session shows
+        // "Choose" until the user replies, although Claude Code reports a normal Stop
+        public Boolean AwaitsReply { get; set; }
+
         public Int64 InputTokens { get; set; }
         public Int64 OutputTokens { get; set; }
         public Int64 CacheReadTokens { get; set; }

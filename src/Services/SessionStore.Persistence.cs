@@ -87,7 +87,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                         continue;
                     }
                     if (session.State is AgentSessionState.Thinking or AgentSessionState.Permission or AgentSessionState.Choose
-                            or AgentSessionState.Background && age > RunningStateMaxAge)
+                            or AgentSessionState.Background && age > RunningStateMaxAge && !session.AwaitsReply)
                     {
                         session.MainTurnRunning = false;
                         session.State = AgentSessionState.Idle;

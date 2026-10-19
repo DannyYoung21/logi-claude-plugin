@@ -1,7 +1,7 @@
 type: plugin4
 name: ClaudeController
 displayName: Claude Controller
-version: 1.0.3
+version: 1.0.4
 author: Daniele Mazzotta
 homePageUrl: https://github.com/DannyYoung21/logi-claude-plugin
 supportPageUrl: https://github.com/DannyYoung21/logi-claude-plugin/issues

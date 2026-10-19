@@ -100,8 +100,8 @@ Requires the .NET SDK and Logi Options+ (the build references `PluginApi.dll` fr
 
 ```bash
 dotnet build -c Release src
-logiplugintool pack bin/Release ClaudeController_1_0_3.lplug4
-logiplugintool verify ClaudeController_1_0_3.lplug4
+logiplugintool pack bin/Release ClaudeController_1_0_4.lplug4
+logiplugintool verify ClaudeController_1_0_4.lplug4
 ```
 
 A Debug build registers the plugin with the Logi Plugin Service for development.
