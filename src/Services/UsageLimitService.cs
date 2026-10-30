@@ -16,7 +16,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
     //  - GET https://api.anthropic.com/api/oauth/usage with the Claude Code login from the macOS keychain (works for the desktop app)
     //  - the statusline JSON of terminal sessions (rate_limits, pushed after every answer)
     // The newest value per window wins. The OAuth token is only read, never refreshed or stored:
-    // refreshing it here would log Claude Code out.
+    // refreshing it here would log Claude Code out. An expired token is renewed by Claude Code itself (TryRenewLogin).
     public class UsageLimitService : IDisposable
     {
         private static readonly Lazy<UsageLimitService> _instance = new(() => new UsageLimitService());
@@ -40,6 +40,11 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         private readonly Timer _redrawTimer;
         private TimeSpan _currentInterval = PollInterval;
         private DateTime _lastFetchUtc = DateTime.MinValue;
+        private DateTime _lastRenewUtc = DateTime.MinValue;
+
+        // Claude Code is started to renew an expired login at most this often, and given this long to finish
+        private static readonly TimeSpan RenewThrottle = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan RenewTimeout = TimeSpan.FromSeconds(60);
 
         public event Action OnLimitsChanged;
 
@@ -79,7 +84,11 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             {
                 this._lastFetchUtc = DateTime.UtcNow;
 
-                var token = ReadAccessToken(out var loginMissing);
+                var token = ReadAccessToken(out var loginMissing, out var expired);
+                if (token == null && expired && !loginMissing && this.TryRenewLogin())
+                {
+                    token = ReadAccessToken(out loginMissing, out _);
+                }
                 this.SetLoginMissing(loginMissing);
                 if (token == null)
                 {
@@ -145,9 +154,11 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         // "refreshTokenExpiresAt":<ms>,…}}. The desktop app signs in on its own and does not keep this one alive:
         // it is renewed by Claude Code in the terminal, and cleared when its sign-in runs out.
         // loginMissing: there is no token, and none will come until the user signs in again.
-        private static String ReadAccessToken(out Boolean loginMissing)
+        // expired: the token ran out, Claude Code can renew it.
+        private static String ReadAccessToken(out Boolean loginMissing, out Boolean expired)
         {
             loginMissing = false;
+            expired = false;
             try
             {
                 var psi = new ProcessStartInfo("/usr/bin/security")
@@ -189,6 +200,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     // Expired: Claude Code refreshes it the next time it runs; never refresh it ourselves.
                     // Once the sign-in behind it has run out too, nothing can renew it.
                     loginMissing = IsPast(oauth, "refreshTokenExpiresAt");
+                    expired = true;
                     PluginLog.Verbose("Claude Code login token is expired, waiting for Claude Code to renew it");
                     return null;
                 }
@@ -198,6 +210,99 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             catch (Exception ex)
             {
                 PluginLog.Warning(ex, "Could not read the Claude Code login from the keychain");
+                return null;
+            }
+        }
+
+        // Claude Code renews an expired login whenever it runs. With only the desktop app in use nothing runs it, so the
+        // plugin starts it once for its local /usage command: Claude Code renews the token itself and saves it in the
+        // keychain. No prompt goes to a model, no hooks run and no session is saved.
+        private Boolean TryRenewLogin()
+        {
+            var now = DateTime.UtcNow;
+            if (now - this._lastRenewUtc < RenewThrottle)
+            {
+                return false;
+            }
+            this._lastRenewUtc = now;
+
+            var claude = FindClaudeCode();
+            if (claude == null)
+            {
+                PluginLog.Info("Claude Code login token is expired and Claude Code was not found to renew it");
+                return false;
+            }
+
+            try
+            {
+                var psi = new ProcessStartInfo(claude)
+                {
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = HookInstaller.DataDir
+                };
+                foreach (var arg in new[] { "-p", "/usage", "--no-session-persistence", "--settings", "{\"disableAllHooks\":true}" })
+                {
+                    psi.ArgumentList.Add(arg);
+                }
+                psi.Environment.Remove("CLAUDE_CODE_ENTRYPOINT");
+                psi.Environment.Remove("CLAUDECODE");
+                Directory.CreateDirectory(HookInstaller.DataDir);
+
+                using var process = Process.Start(psi);
+                process.StandardInput.Close();
+                // The output is not needed, but must be drained so Claude Code never blocks on a full pipe
+                _ = process.StandardOutput.ReadToEndAsync();
+                _ = process.StandardError.ReadToEndAsync();
+                if (!process.WaitForExit((Int32)RenewTimeout.TotalMilliseconds))
+                {
+                    process.Kill(entireProcessTree: true);
+                    PluginLog.Warning("Claude Code did not finish renewing its login");
+                    return false;
+                }
+
+                PluginLog.Info($"Asked Claude Code to renew its expired login (exit code {process.ExitCode})");
+                return process.ExitCode == 0;
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Warning(ex, "Could not run Claude Code to renew its login");
+                return false;
+            }
+        }
+
+        // Claude Code in the terminal first (it holds the keychain login), else the desktop app's own copy
+        // (claude-code/<version>/<build>/claude.app/Contents/MacOS/claude)
+        private static String FindClaudeCode()
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var installed = new[]
+            {
+                Path.Combine(home, ".local", "bin", "claude"),
+                "/opt/homebrew/bin/claude",
+                "/usr/local/bin/claude",
+                Path.Combine(home, ".claude", "local", "claude")
+            }.FirstOrDefault(File.Exists);
+            if (installed != null)
+            {
+                return installed;
+            }
+
+            try
+            {
+                var bundled = Path.Combine(home, "Library", "Application Support", "Claude", "claude-code");
+                return Directory.Exists(bundled)
+                    ? Directory.EnumerateFiles(bundled, "claude", SearchOption.AllDirectories)
+                        .Where(p => p.EndsWith("/Contents/MacOS/claude", StringComparison.Ordinal))
+                        .OrderByDescending(File.GetLastWriteTimeUtc)
+                        .FirstOrDefault()
+                    : null;
+            }
+            catch (Exception)
+            {
                 return null;
             }
         }

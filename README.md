@@ -64,8 +64,10 @@ command contains `client=claude-controller`, and set `statusLine` back to the va
 - **Keychain** – for the usage limits the plugin reads Claude Code's sign-in (`Claude Code-credentials`) with
   macOS's own `security` tool. If macOS asks, allow it. Without it everything else works; the limits then only
   update from terminal sessions.
-  The desktop app signs in on its own and does not keep this sign-in alive. If it runs out, the limit keys show
-  `--` and "No Login": run `claude auth login` in the terminal.
+  The desktop app signs in on its own and does not keep this sign-in alive. When its token has expired, the plugin
+  runs Claude Code's local `claude -p /usage` command (no prompt goes to a model, no hooks, no saved session), and
+  Claude Code renews the token itself. If the sign-in has run out completely, the limit keys show `--` and
+  "No Login": run `claude auth login` in the terminal.
 - **Accessibility** – only needed when you press Stop while a desktop session is writing text without using a
   tool. The plugin then sends Esc to the Claude app. macOS asks once:
   *System Settings → Privacy & Security → Accessibility → enable "Logi Plugin Service"*.
@@ -74,7 +76,7 @@ command contains `client=claude-controller`, and set `statusLine` back to the va
 
 The plugin has exactly one network connection: every few minutes (and when you press a limit key) it asks
 `api.anthropic.com` for **your own usage limits**, using the Claude sign-in already on your Mac. The sign-in token
-is read fresh each time, never stored, never refreshed and never sent anywhere else.
+is read fresh each time, never stored, never refreshed by the plugin and never sent anywhere else.
 
 Everything else stays on your Mac. The plugin keeps a small cache in
 `~/Library/Application Support/ClaudeController/` (last limits, session status across restarts, and a local
@@ -102,8 +104,8 @@ Requires the .NET SDK and Logi Options+ (the build references `PluginApi.dll` fr
 
 ```bash
 dotnet build -c Release src
-logiplugintool pack bin/Release ClaudeController_1_0_6.lplug4
-logiplugintool verify ClaudeController_1_0_6.lplug4
+logiplugintool pack bin/Release ClaudeController_1_0_7.lplug4
+logiplugintool verify ClaudeController_1_0_7.lplug4
 ```
 
 A Debug build registers the plugin with the Logi Plugin Service for development.
