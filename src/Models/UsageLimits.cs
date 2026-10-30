@@ -32,6 +32,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
         public Boolean Available { get; set; }
         public Boolean Enabled { get; set; }
         public Double UsedPercent { get; set; }
+        public DateTime UpdatedUtc { get; set; }
     }
 
     public class UsageSummary
@@ -46,6 +47,17 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
 
         // False until a source answered once; tiles then show placeholders instead of 0%
         public Boolean IsLive { get; set; }
+
+        // The keychain holds no usable Claude Code login (signed out, or its sign-in expired): only terminal
+        // sessions still update the limits
+        [JsonIgnore]
+        public Boolean LoginMissing { get; set; }
+
+        // The API is polled every few minutes (15 at most after rate limiting): a value no source renewed for longer
+        // than this no longer says anything, and tiles show placeholders instead of freezing it
+        private static readonly TimeSpan OutdatedAfter = TimeSpan.FromMinutes(20);
+
+        public static Boolean IsOutdated(DateTime updatedUtc) => DateTime.UtcNow - updatedUtc > OutdatedAfter;
 
         public QuotaWindow For(LimitWindow window) => window switch
         {

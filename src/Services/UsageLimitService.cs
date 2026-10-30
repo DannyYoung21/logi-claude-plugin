@@ -79,7 +79,8 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             {
                 this._lastFetchUtc = DateTime.UtcNow;
 
-                var token = ReadAccessToken();
+                var token = ReadAccessToken(out var loginMissing);
+                this.SetLoginMissing(loginMissing);
                 if (token == null)
                 {
                     return;
@@ -127,9 +128,26 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             }
         }
 
-        // Claude Code keeps its login in the keychain as JSON: {"claudeAiOauth":{"accessToken":…,"expiresAt":<ms>,…}}
-        private static String ReadAccessToken()
+        private void SetLoginMissing(Boolean missing)
         {
+            if (this.Usage.LoginMissing == missing)
+            {
+                return;
+            }
+            this.Usage.LoginMissing = missing;
+            PluginLog.Info(missing
+                ? "No usable Claude Code login in the keychain: run `claude auth login` in the terminal to update the limits"
+                : "Claude Code login found in the keychain");
+            this.OnLimitsChanged?.Invoke();
+        }
+
+        // Claude Code keeps its login in the keychain as JSON: {"claudeAiOauth":{"accessToken":…,"expiresAt":<ms>,
+        // "refreshTokenExpiresAt":<ms>,…}}. The desktop app signs in on its own and does not keep this one alive:
+        // it is renewed by Claude Code in the terminal, and cleared when its sign-in runs out.
+        // loginMissing: there is no token, and none will come until the user signs in again.
+        private static String ReadAccessToken(out Boolean loginMissing)
+        {
+            loginMissing = false;
             try
             {
                 var psi = new ProcessStartInfo("/usr/bin/security")
@@ -151,26 +169,31 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 process.WaitForExit();
                 if (process.ExitCode != 0)
                 {
-                    PluginLog.Info("No Claude Code login found in the keychain");
+                    loginMissing = true;
                     return null;
                 }
 
                 using var doc = JsonDocument.Parse(output);
-                if (!doc.RootElement.TryGetProperty("claudeAiOauth", out var oauth) ||
-                    !oauth.TryGetProperty("accessToken", out var tokenElement))
+                var token = doc.RootElement.TryGetProperty("claudeAiOauth", out var oauth) &&
+                    oauth.TryGetProperty("accessToken", out var tokenElement) && tokenElement.ValueKind == JsonValueKind.String
+                    ? tokenElement.GetString()
+                    : null;
+                if (String.IsNullOrEmpty(token))
                 {
+                    loginMissing = true;
                     return null;
                 }
 
-                if (oauth.TryGetProperty("expiresAt", out var expiresAt) && expiresAt.TryGetInt64(out var expiresMs) &&
-                    DateTimeOffset.FromUnixTimeMilliseconds(expiresMs) <= DateTimeOffset.UtcNow)
+                if (IsPast(oauth, "expiresAt"))
                 {
-                    // Expired: Claude Code refreshes it the next time it runs; never refresh it ourselves
-                    PluginLog.Info("Claude Code login token is expired, waiting for Claude Code to renew it");
+                    // Expired: Claude Code refreshes it the next time it runs; never refresh it ourselves.
+                    // Once the sign-in behind it has run out too, nothing can renew it.
+                    loginMissing = IsPast(oauth, "refreshTokenExpiresAt");
+                    PluginLog.Verbose("Claude Code login token is expired, waiting for Claude Code to renew it");
                     return null;
                 }
 
-                return tokenElement.GetString();
+                return token;
             }
             catch (Exception ex)
             {
@@ -228,12 +251,13 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     {
                         Available = true,
                         Enabled = extra.TryGetProperty("is_enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
-                        UsedPercent = GetDouble(extra, "utilization") ?? 0
+                        UsedPercent = GetDouble(extra, "utilization") ?? 0,
+                        UpdatedUtc = now
                     };
                 }
                 else
                 {
-                    usage.Extra = new ExtraUsage { Available = false };
+                    usage.Extra = new ExtraUsage { Available = false, UpdatedUtc = now };
                 }
 
                 usage.IsLive = true;
@@ -352,6 +376,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 : new QuotaWindow { Available = false, UpdatedUtc = now };
             return true;
         }
+
+        // A time in unix milliseconds that has passed (false if missing)
+        private static Boolean IsPast(JsonElement e, String name) =>
+            e.TryGetProperty(name, out var v) && v.TryGetInt64(out var ms) && DateTimeOffset.FromUnixTimeMilliseconds(ms) <= DateTimeOffset.UtcNow;
 
         private static String GetString(JsonElement e, String name) =>
             e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

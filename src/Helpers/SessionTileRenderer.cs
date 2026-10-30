@@ -202,7 +202,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
         {
             var title = LimitTitle(window, usage.ModelName);
             var quota = usage.For(window);
-            return !usage.IsLive
+            return !usage.IsLive || UsageSummary.IsOutdated(quota.UpdatedUtc)
                 ? RenderGauge(imageSize, title, "--", 0, TrackColor)
                 : !quota.Available
                     ? RenderGauge(imageSize, title, "n/a", 0, TrackColor)
@@ -214,7 +214,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
         {
             const String title = "Extra";
             var extra = usage.Extra;
-            return !usage.IsLive
+            return !usage.IsLive || UsageSummary.IsOutdated(extra.UpdatedUtc)
                 ? RenderGauge(imageSize, title, "--", 0, TrackColor)
                 : !extra.Available
                     ? RenderGauge(imageSize, title, "n/a", 0, TrackColor)
@@ -272,10 +272,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
 
             var quota = usage.For(window);
             var remaining = quota.RemainingUntilReset;
-            if (!usage.IsLive)
+            if (!usage.IsLive || UsageSummary.IsOutdated(quota.UpdatedUtc))
             {
                 bb.DrawText("--:--", 0, valueY, w, valueH, TextWhite, 18);
-                bb.DrawText("Loading...", 0, captionY, w, captionH, TextDim, 13);
+                bb.DrawText(usage.LoginMissing ? "No Login" : "Loading...", 0, captionY, w, captionH, TextDim, 13);
                 bb.FillRectangle(barMargin, barY, barW, barH, TrackColor);
             }
             else if (!quota.Available)
