@@ -13,6 +13,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
     {
         private const String InterruptMarker = "[Request interrupted by user";
         private const String SessionIdField = "\"sessionId\":\"";
+        private const String WrapUpTool = "mcp__ccd_turn__wrap_up";
 
         // A background subagent that pauses while its own background work (a monitor, a test run) goes on reports back
         // with this note; the turn of the main agent then ends with nothing "in flight", although the subagent resumes later.
@@ -52,6 +53,9 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         // The desktop app restarts Claude Code under a new session id and copies the transcript, whose old lines keep
         // the old id: the last id that is not this transcript's own is the session it continues
         public String PredecessorId { get; private set; }
+
+        // Id of the last call of the desktop app's wrap-up tool: it names the next-step box in the app's own records
+        public String LastWrapUpToolUseId { get; private set; }
 
         private readonly String _ownId;
 
@@ -127,6 +131,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             this.InputTokens = this.OutputTokens = this.CacheReadTokens = this.CacheCreationTokens = 0;
             this.ContextUsedTokens = 0;
             this.InterruptedAtUtc = null;
+            this.LastWrapUpToolUseId = null;
             this._pausedAgents.Clear();
         }
 
@@ -186,6 +191,18 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                     !model.GetString().StartsWith("<", StringComparison.Ordinal))
                 {
                     this.Model = model.GetString();
+                }
+                if (line.Contains(WrapUpTool, StringComparison.Ordinal) &&
+                    message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var block in content.EnumerateArray())
+                    {
+                        if (block.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String && name.GetString() == WrapUpTool &&
+                            block.TryGetProperty("id", out var toolId) && toolId.ValueKind == JsonValueKind.String)
+                        {
+                            this.LastWrapUpToolUseId = toolId.GetString();
+                        }
+                    }
                 }
                 if (!message.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
                 {

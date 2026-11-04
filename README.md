@@ -90,6 +90,8 @@ event log with session titles). It collects no analytics and contains no trackin
   exact token count, and the ring only for terminal sessions, where Claude Code reports the window size.
 - Pressing the slot of a terminal session brings the terminal app to the front.
 - Only sessions running on this Mac get slots (no cloud sessions).
+- After you close a next-step box with its X, the tile can take up to about a minute to leave Choose: the desktop app
+  writes this to disk only that often.
 
 ## Support
 
@@ -104,8 +106,8 @@ Requires the .NET SDK and Logi Options+ (the build references `PluginApi.dll` fr
 
 ```bash
 dotnet build -c Release src
-logiplugintool pack bin/Release ClaudeController_1_0_7.lplug4
-logiplugintool verify ClaudeController_1_0_7.lplug4
+logiplugintool pack bin/Release ClaudeController_1_0_8.lplug4
+logiplugintool verify ClaudeController_1_0_8.lplug4
 ```
 
 A Debug build registers the plugin with the Logi Plugin Service for development.

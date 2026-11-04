@@ -542,6 +542,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
             var now = DateTime.UtcNow;
             var shellParents = this.ReadShellParentsIfNeeded(work.Select(w => w.Session), now);
+            var dismissedBoxes = this.ReadDismissedBoxes(work);
             foreach (var (session, reader) in work)
             {
                 reader.Update();
@@ -567,6 +568,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                         this._stopRequested.Remove(session.Id);
                     }
                     UpdateBackgroundState(session, reader, shellParents, now);
+                    EndDismissedWait(session, reader, dismissedBoxes, now);
                 }
             }
         }
