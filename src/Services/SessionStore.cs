@@ -141,6 +141,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                         Log($"[HOOK] Stop {id}: a background subagent paused on its own background work");
                     }
                     ApplyEvent(session, evt, payload, agentsPaused);
+                    if (evt == "SessionStart" && GetString(payload, "source") == "compact")
+                    {
+                        this.EndCompactedWait(session, now);
+                    }
                     this.KeepWaitingState(session);
                     if (halted)
                     {

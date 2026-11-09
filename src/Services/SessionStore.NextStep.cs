@@ -84,12 +84,27 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 return;
             }
 
-            var next = session.HasBackgroundWork || reader.HasPausedAgents(now) ? AgentSessionState.Background : AgentSessionState.Complete;
-            Log($"[STATE] {session.DisplayName}: {session.State} -> {next} (next-step box closed)");
+            var before = session.State;
+            EndBoxWait(session, reader.HasPausedAgents(now));
+            Log($"[STATE] {session.DisplayName}: {before} -> {session.State} (next-step box closed)");
+            session.StatusSince = now;
+        }
+
+        // /compact instead of an answer: the app drops the box along with the old conversation. An automatic compact runs
+        // in the middle of a turn, when no box is waiting, and changes nothing.
+        private void EndCompactedWait(ClaudeSession session, DateTime now)
+        {
+            if (WaitsOnBox(session))
+            {
+                EndBoxWait(session, this.HasPausedAgents(session, now));
+            }
+        }
+
+        private static void EndBoxWait(ClaudeSession session, Boolean agentsPaused)
+        {
             session.AwaitsReply = false;
             session.WaitingAgentId = null;
-            session.State = next;
-            session.StatusSince = now;
+            session.State = session.HasBackgroundWork || agentsPaused ? AgentSessionState.Background : AgentSessionState.Complete;
         }
     }
 }

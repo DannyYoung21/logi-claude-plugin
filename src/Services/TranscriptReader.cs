@@ -15,6 +15,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
         private const String SessionIdField = "\"sessionId\":\"";
         private const String WrapUpTool = "mcp__ccd_turn__wrap_up";
 
+        // At most this much per call. A transcript can pass 1 GB, more than fits in one string; called every second,
+        // a long one catches up over a few calls.
+        private const Int32 MaxReadBytes = 64 * 1024 * 1024;
+
         // A background subagent that pauses while its own background work (a monitor, a test run) goes on reports back
         // with this note; the turn of the main agent then ends with nothing "in flight", although the subagent resumes later.
         // Only lines Claude Code itself marks as a task-notification count: a summary, a prompt or tool output that merely
@@ -89,7 +93,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 }
 
                 stream.Seek(this._offset, SeekOrigin.Begin);
-                var buffer = new Byte[stream.Length - this._offset];
+                var buffer = new Byte[Math.Min(stream.Length - this._offset, MaxReadBytes)];
                 var read = 0;
                 while (read < buffer.Length)
                 {
@@ -102,10 +106,15 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 var end = Array.LastIndexOf(buffer, (Byte)'\n', read - 1);
                 if (end < 0)
                 {
+                    // A line longer than a whole read is nothing we need; waiting for its end would block all that follows
+                    if (read == MaxReadBytes)
+                    {
+                        this._offset += read;
+                    }
                     return false;
                 }
 
-                var text = Encoding.UTF8.GetString(buffer, 0, end + 1);
+                var text =Encoding.UTF8.GetString(buffer, 0, end + 1);
                 this._offset += end + 1;
 
                 foreach (var line in text.Split('\n'))
