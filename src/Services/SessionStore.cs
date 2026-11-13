@@ -237,7 +237,16 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
             if (evt == "UserPromptSubmit" || (!fromSubagent && isToolHook))
             {
                 session.MainTurnRunning = true;
-                session.AwaitsReply = evt == "PostToolUse" && IsNextStepQuestion(payload);
+                // The box is drawn when the turn ends, so only a new prompt or a later wrap-up changes it. Tools that
+                // finish after the wrap-up (called in parallel with it, or the closing message's tools) leave it.
+                if (evt == "UserPromptSubmit")
+                {
+                    session.AwaitsReply = false;
+                }
+                else if (evt == "PostToolUse" && IsWrapUp(payload))
+                {
+                    session.AwaitsReply = IsNextStepQuestion(payload);
+                }
             }
             else if (working == AgentSessionState.Background && isToolHook)
             {
@@ -356,8 +365,10 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
         // The desktop app's wrap-up tool with a question shows it with answer buttons and ends the turn. Its result says
         // whether the box really shows the question ("Nothing is pending, so the app draws no box" otherwise).
+        private static Boolean IsWrapUp(JsonElement payload) => GetString(payload, "tool_name") == "mcp__ccd_turn__wrap_up";
+
         private static Boolean IsNextStepQuestion(JsonElement payload) =>
-            GetString(payload, "tool_name") == "mcp__ccd_turn__wrap_up" &&
+            IsWrapUp(payload) &&
             payload.TryGetProperty("tool_input", out var input) && !String.IsNullOrWhiteSpace(GetString(input, "ask")) &&
             !(payload.TryGetProperty("tool_response", out var response) &&
               response.GetRawText().Contains("draws no box", StringComparison.Ordinal));
