@@ -25,6 +25,8 @@ in the Claude desktop app (Code tab) and in the terminal – to the **Logitech M
 - **Context** and **Tokens** – the exact context size of the last request and the token counts of a session.
 - **New Code Session**, **New Chat / Cowork Task** and **Open Claude**.
 - **Clear Finished**, **Refresh**, **Slot Order** (sticky, most recent activity, or most recent status change).
+- **Swap Slots** – press it, then tap two slot tiles: their sessions trade places. This switches Slot Order to
+  Sticky, which keeps your order. Press it again to cancel.
 - **Claude Hooks On/Off** – removes everything the plugin added to Claude Code's settings, or adds it again.
 
 ## Requirements
@@ -107,8 +109,8 @@ Requires the .NET SDK and Logi Options+ (the build references `PluginApi.dll` fr
 
 ```bash
 dotnet build -c Release src
-logiplugintool pack bin/Release ClaudeController_1_0_10.lplug4
-logiplugintool verify ClaudeController_1_0_10.lplug4
+logiplugintool pack bin/Release ClaudeController_1_0_11.lplug4
+logiplugintool verify ClaudeController_1_0_11.lplug4
 ```
 
 A Debug build registers the plugin with the Logi Plugin Service for development.

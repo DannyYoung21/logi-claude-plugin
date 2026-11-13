@@ -33,19 +33,25 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
             UsageLimitService.Instance.OnLimitsChanged += this.OnLimitsChanged;
             TileAnimationService.Instance.OnAnimationTick += this.OnAnimationTick;
             SessionStore.Instance.OnHeartbeat += this.OnHeartbeat;
+            SessionStore.Instance.OnSwapChanged += this.RefreshTile;
         }
 
         private static String Shown(ClaudeSession session) => session == null ? "empty" : $"{session.SlotKey}:{session.State}:{session.DisplayName}";
 
+        // The slot tile also shows whether Swap Slots picked it
+        private String ShownTile(ClaudeSession session) => Shown(session) + (this.IsSwapPick ? ":swap" : "");
+
+        private Boolean IsSwapPick => SessionStore.Instance.SwapFirstSlot == this.SlotNumber;
+
         private void OnHeartbeat()
         {
-            var shown = Shown(this.Session);
+            var shown = this.ShownTile(this.Session);
             // Only tiles the device has drawn at all (a slot that is not on the keypad is never asked for)
             if (this._drawnTile != null && shown != this._drawnTile)
             {
                 this.RefreshTile();
             }
-            if (this._isActive && shown != this._drawnStatusKey)
+            if (this._isActive && Shown(this.Session) != this._drawnStatusKey)
             {
                 this.CommandImageChanged("ProjectStatus");
             }
@@ -95,6 +101,14 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
 
         public override Boolean Activate()
         {
+            // While Swap Slots runs, the press picks this slot and the folder closes again right away
+            if (SessionStore.Instance.PickSwapSlot(this.SlotNumber))
+            {
+                var opened = base.Activate();
+                System.Threading.Tasks.Task.Delay(50).ContinueWith(_ => this.Close());
+                return opened;
+            }
+
             this._isActive = true;
             SessionStore.Instance.CurrentActiveSlot = this.SlotNumber;
             SessionStore.Instance.HoldSlot(this.SlotNumber);
@@ -128,8 +142,8 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
         public override BitmapImage GetButtonImage(PluginImageSize imageSize)
         {
             var session = this.Session;
-            this._drawnTile = Shown(session);
-            return SessionTileRenderer.RenderSlotTile(this.SlotNumber, session, TileAnimationService.Instance.CurrentBreath, imageSize, isFolder: true);
+            this._drawnTile = this.ShownTile(session);
+            return SessionTileRenderer.RenderSlotTile(this.SlotNumber, session, TileAnimationService.Instance.CurrentBreath, imageSize, isFolder: true, swapPick: this.IsSwapPick);
         }
 
         public override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)

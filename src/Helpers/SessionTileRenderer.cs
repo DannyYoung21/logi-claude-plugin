@@ -48,7 +48,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
 
         // ---------------------------------------------------------------- Session tile
 
-        public static BitmapImage RenderSlotTile(Int32 slotNumber, ClaudeSession session, Double breath, PluginImageSize imageSize, Boolean isFolder = false)
+        public static BitmapImage RenderSlotTile(Int32 slotNumber, ClaudeSession session, Double breath, PluginImageSize imageSize, Boolean isFolder = false, Boolean swapPick = false)
         {
             using var bb = new BitmapBuilder(imageSize);
             var w = bb.Width;
@@ -69,6 +69,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
                 var emptyTop = topMargin + CenterTop(h - topMargin, 44);
                 bb.DrawText($"Slot {slotNumber}", 0, emptyTop, w, 22, TextDim, 17);
                 bb.DrawText("Empty", 0, emptyTop + 22, w, 22, TextMuted, 16);
+                if (swapPick) DrawSwapFrame(bb, large);
                 return bb.ToImage();
             }
 
@@ -119,7 +120,18 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
                 y += lineH;
             }
 
+            if (swapPick) DrawSwapFrame(bb, large);
             return bb.ToImage();
+        }
+
+        // White frame around the slot Swap Slots picked first (white stays visible on every status color)
+        private static void DrawSwapFrame(BitmapBuilder bb, Boolean large)
+        {
+            var t = large ? 5 : 4;
+            bb.FillRectangle(0, 0, bb.Width, t, TextWhite);
+            bb.FillRectangle(0, bb.Height - t, bb.Width, t, TextWhite);
+            bb.FillRectangle(0, 0, t, bb.Height, TextWhite);
+            bb.FillRectangle(bb.Width - t, 0, t, bb.Height, TextWhite);
         }
 
         // Largest font that fits the name on at most two lines (one line is preferred while the font
@@ -527,6 +539,27 @@ namespace Loupedeck.ClaudeControllerPlugin.Helpers
 
             var barW = Math.Min(w - 24, 72);
             bb.FillRectangle((w - barW) / 2, top + line1H + line2H + gap, barW, barH, installed ? AccentGreen : TrackColor);
+
+            return bb.ToImage();
+        }
+
+        // Swap Slots: idle, waiting for the first slot, or for the second one
+        public static BitmapImage RenderSwapKey(Boolean active, Int32? firstSlot, PluginImageSize imageSize)
+        {
+            using var bb = new BitmapBuilder(imageSize);
+            var w = bb.Width;
+            var h = bb.Height;
+            bb.Clear(TileBaseColor);
+
+            const Int32 line1H = 20, line2H = 22, gap = 8, barH = 8;
+            var top = CenterTop(h, line1H + line2H + gap + barH);
+            var line1 = !active ? "Swap" : firstSlot.HasValue ? $"Slot {firstSlot} ↔" : "Swap";
+            var line2 = !active ? "Slots" : firstSlot.HasValue ? "Pick 2nd" : "Pick 1st";
+            bb.DrawText(line1, 0, top, w, line1H, TextWhite, 15);
+            bb.DrawText(line2, 0, top + line1H, w, line2H, active ? TextWhite : TextMuted, 18);
+
+            var barW = Math.Min(w - 24, 72);
+            bb.FillRectangle((w - barW) / 2, top + line1H + line2H + gap, barW, barH, active ? AccentOrange : TrackColor);
 
             return bb.ToImage();
         }

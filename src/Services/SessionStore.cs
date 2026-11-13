@@ -436,6 +436,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 }
                 this.DropStaleSessions();
                 this.Recompute();
+                this.ExpireSwap();
                 this.OnHeartbeat?.Invoke();
             }
             catch (Exception ex)
@@ -793,8 +794,13 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 this._slotAssignment.RequestResort();
             }
             Log($"[SLOTS] Slot order set to {strategy}");
+            this.CancelSwapUnlessSticky(strategy);
             this.Recompute(force: true);
+            this.OnSlotOrderChanged?.Invoke();
         }
+
+        // The Slot Order key follows when a swap switches to Sticky
+        public event Action OnSlotOrderChanged;
 
         // While a slot folder is open its session stays in that slot (same as the Claude Desktop plugin)
         public void HoldSlot(Int32 slot)

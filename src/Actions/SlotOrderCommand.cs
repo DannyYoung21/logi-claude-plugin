@@ -15,7 +15,19 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
             {
                 this.AddState(strategy.ToString().ToLowerInvariant(), strategy.ToString(), Describe(strategy));
             }
+
+            // Swap Slots switches to Sticky by itself
+            SessionStore.Instance.OnSlotOrderChanged += () =>
+            {
+                if (this._loaded)
+                {
+                    this.SetCurrentState((Int32)SessionStore.Instance.SlotOrder);
+                    this.ActionImageChanged();
+                }
+            };
         }
+
+        private Boolean _loaded;
 
         public static String Describe(SlotOrderStrategy strategy) => strategy switch
         {
@@ -28,6 +40,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
         {
             (this.Plugin as ClaudeControllerPlugin)?.RestoreSlotOrder();
             this.SetCurrentState((Int32)SessionStore.Instance.SlotOrder);
+            this._loaded = true;
             return base.OnLoad();
         }
 

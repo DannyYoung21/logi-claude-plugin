@@ -127,6 +127,27 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
                 return $"hooks installed: {HookInstaller.IsInstalled()}";
             }
             var store = SessionStore.Instance;
+            // Swap Slots without the device: key=Swap starts or cancels, key=Slot3 is a press on slot 3's tile
+            if (key == "Slots")
+            {
+                return String.Join(" | ", Enumerable.Range(1, SlotAssignmentService.MaxSlots)
+                    .Select(n => $"{n}:{store.GetSessionForSlot(n)?.DisplayName ?? "-"}")) + $" ({store.SlotOrder})";
+            }
+            if (key == "Sticky" || key == "Settled" || key == "Recency")
+            {
+                store.SetSlotOrder(Enum.Parse<Models.SlotOrderStrategy>(key));
+                return $"slot order {store.SlotOrder} (not saved)";
+            }
+            if (key == "Swap")
+            {
+                store.ToggleSwap();
+                return $"swap active: {store.SwapActive}";
+            }
+            if (key?.StartsWith("Slot") == true && Int32.TryParse(key.Substring(4), out var slot))
+            {
+                var picked = store.PickSwapSlot(slot);
+                return $"slot {slot}: {(picked ? "picked for swap" : "no swap running")}, first {store.SwapFirstSlot?.ToString() ?? "-"}";
+            }
             var session = store.Sessions.FirstOrDefault(s => s.DisplayName == title);
             if (session == null)
             {

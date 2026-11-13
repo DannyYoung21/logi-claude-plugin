@@ -41,6 +41,17 @@ namespace Loupedeck.ClaudeControllerPlugin.Services
 
         public void Restore(Dictionary<Int32, String> slots) => this._slots = new Dictionary<Int32, String>(slots);
 
+        // Two slots trade their sessions (an empty slot just takes the other one's). Only Sticky keeps the result.
+        public void Swap(Int32 a, Int32 b)
+        {
+            var keyA = this.GetKey(a);
+            var keyB = this.GetKey(b);
+            this._slots.Remove(a);
+            this._slots.Remove(b);
+            if (keyB != null) this._slots[a] = keyB;
+            if (keyA != null) this._slots[b] = keyA;
+        }
+
         public void Sync(IReadOnlyList<ClaudeSession> sessions, SlotOrderStrategy strategy, String heldKey)
         {
             var resort = strategy switch
