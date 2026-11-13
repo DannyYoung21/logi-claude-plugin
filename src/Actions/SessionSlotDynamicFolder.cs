@@ -112,7 +112,7 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType _) => PluginDynamicFolderNavigation.None;
 
         // Row 0: Back, Context, Project status (opens the session)
-        // Row 1: 5h limit, 5h reset time, Allow once
+        // Row 1: 5h limit, 5h reset time, Allow once (without a 5h limit: the model's weekly limit, e.g. Fable 7d)
         // Row 2: 7d limit, 7d reset time, Stop
         public override String[] GetButtonPressActionNames(DeviceType deviceType)
         {
@@ -143,9 +143,9 @@ namespace Loupedeck.ClaudeControllerPlugin.Actions
                 "AllowOnce" => SessionTileRenderer.RenderAllowOnceKey(session, imageSize),
                 "Stop" => SessionTileRenderer.RenderStopKey(session?.State is AgentSessionState.Thinking or AgentSessionState.Permission, imageSize),
                 "Context" => SessionTileRenderer.RenderContextKey(session, imageSize),
-                "FiveHourLimit" => SessionTileRenderer.RenderLimitKey(LimitWindow.FiveHour, usage, imageSize),
+                "FiveHourLimit" => SessionTileRenderer.RenderLimitKey(usage.FirstWindow, usage, imageSize),
                 "WeeklyLimit" => SessionTileRenderer.RenderLimitKey(LimitWindow.Weekly, usage, imageSize),
-                "FiveHourResetTime" => SessionTileRenderer.RenderResetKey(LimitWindow.FiveHour, usage, imageSize),
+                "FiveHourResetTime" => SessionTileRenderer.RenderResetKey(usage.FirstWindow, usage, imageSize),
                 "WeeklyResetTime" => SessionTileRenderer.RenderResetKey(LimitWindow.Weekly, usage, imageSize),
                 _ => this.GetButtonImage(imageSize)
             };

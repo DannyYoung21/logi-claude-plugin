@@ -20,7 +20,8 @@ in the Claude desktop app (Code tab) and in the terminal – to the **Logitech M
 - **Stop** – stops a running session (a waiting request is denied and the turn is interrupted).
 - **Next Waiting Session** – lights up when a session waits for you; press to jump to it.
 - **Usage limits** – usage ring and reset countdown for the 5-hour limit, the weekly limit, the weekly limit of a
-  single model (when your plan has one) and extra usage.
+  single model (when your plan has one) and extra usage. If your plan has no 5-hour limit, a session's folder shows
+  the weekly limit of that model in its place.
 - **Context** and **Tokens** – the exact context size of the last request and the token counts of a session.
 - **New Code Session**, **New Chat / Cowork Task** and **Open Claude**.
 - **Clear Finished**, **Refresh**, **Slot Order** (sticky, most recent activity, or most recent status change).
@@ -106,8 +107,8 @@ Requires the .NET SDK and Logi Options+ (the build references `PluginApi.dll` fr
 
 ```bash
 dotnet build -c Release src
-logiplugintool pack bin/Release ClaudeController_1_0_9.lplug4
-logiplugintool verify ClaudeController_1_0_9.lplug4
+logiplugintool pack bin/Release ClaudeController_1_0_10.lplug4
+logiplugintool verify ClaudeController_1_0_10.lplug4
 ```
 
 A Debug build registers the plugin with the Logi Plugin Service for development.

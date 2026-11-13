@@ -59,6 +59,11 @@ namespace Loupedeck.ClaudeControllerPlugin.Models
 
         public static Boolean IsOutdated(DateTime updatedUtc) => DateTime.UtcNow - updatedUtc > OutdatedAfter;
 
+        // Plans without a 5-hour limit (the API sends five_hour: null) show the weekly limit of the model in its place
+        [JsonIgnore]
+        public LimitWindow FirstWindow =>
+            this.IsLive && !this.FiveHour.Available && this.ModelWeekly.Available ? LimitWindow.ModelWeekly : LimitWindow.FiveHour;
+
         public QuotaWindow For(LimitWindow window) => window switch
         {
             LimitWindow.Weekly => this.Weekly,
